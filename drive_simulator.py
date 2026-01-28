@@ -472,11 +472,25 @@ def spawn_pedestrians(world: carla.World, count: int) -> Tuple[List[carla.Actor]
 # =============================================================================
 
 def ensure_town(client: carla.Client, town: str) -> carla.World:
-    """Load the requested town if needed."""
     world = client.get_world()
-    if town not in world.get_map().name:
-        world = client.load_world(town)
-        time.sleep(10.0)  # give CARLA time after map load
+    if town in world.get_map().name:
+        return world
+
+    # Map load can take a while
+    client.set_timeout(30.0)
+    world = client.load_world(town)
+
+    # Wait until server is responsive on the new world
+    deadline = time.time() + 30.0
+    while time.time() < deadline:
+        try:
+            _ = world.get_map().name
+            world.wait_for_tick(1.0)
+            break
+        except RuntimeError:
+            time.sleep(0.2)
+
+    client.set_timeout(5.0)  # restore if you want
     return world
 
 
